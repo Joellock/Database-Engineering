@@ -1,0 +1,75 @@
+import pyodbc
+
+# 1. INITIAL CONNECTION: Connect to master to handle the creation process
+server = r'LAPTOP-UATOMV5O\SQLEXPRESS'
+conn = pyodbc.connect(f'DRIVER={{SQL Server}};SERVER={server};DATABASE=master;Trusted_Connection=yes;')
+conn.autocommit = True
+cursor = conn.cursor()
+
+# 2. EXPLICIT DATABASE CREATION (The "Clean Slate" Method)
+# This kicks out any active connections so the DROP and CREATE work perfectly
+cursor.execute("""
+    IF EXISTS (SELECT * FROM sys.databases WHERE name = 'dwh')
+    BEGIN
+        ALTER DATABASE dwh SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+        DROP DATABASE dwh;
+    END
+""")
+cursor.execute("CREATE DATABASE dwh")
+print("Action: Database 'dwh' created explicitly.")
+
+# 3. SWITCH TO THE NEW DATABASE
+conn = pyodbc.connect(f'DRIVER={{SQL Server}};SERVER={server};DATABASE=dwh;Trusted_Connection=yes;')
+cursor = conn.cursor()
+
+# 4. EXPLICIT SCHEMA CREATION
+cursor.execute("CREATE SCHEMA schema1")
+print("Action: Schema 'schema1' created explicitly.")
+
+# 5. CREATE TABLES: Exact headers from your uploaded CSV files
+# CRM Source Tables
+cursor.execute("""
+    CREATE TABLE schema1.cust_info (
+        cst_id FLOAT, 
+        cst_key VARCHAR(50), 
+        cst_firstname VARCHAR(50), 
+        cst_lastname VARCHAR(50), 
+        cst_marital_status VARCHAR(5), 
+        cst_gndr VARCHAR(5), 
+        cst_create_date DATE
+    )
+""")
+
+cursor.execute("""
+    CREATE TABLE schema1.prd_info (
+        prd_id INT, 
+        prd_key VARCHAR(50), 
+        prd_nm VARCHAR(100), 
+        prd_cost FLOAT, 
+        prd_line VARCHAR(10), 
+        prd_start_dt DATE, 
+        prd_end_dt DATE
+    )
+""")
+
+cursor.execute("""
+    CREATE TABLE schema1.sales_details (
+        sls_ord_num VARCHAR(50), 
+        sls_prd_key VARCHAR(50), 
+        sls_cust_id INT, 
+        sls_order_dt DATE, 
+        sls_ship_dt DATE, 
+        sls_due_dt DATE, 
+        sls_sales FLOAT, 
+        sls_quantity INT, 
+        sls_price FLOAT
+    )
+""")
+
+# ERP Source Tables
+cursor.execute("CREATE TABLE schema1.CUST_AZ12 (CID VARCHAR(50), BDATE DATE, GEN VARCHAR(10))")
+cursor.execute("CREATE TABLE schema1.LOC_A101 (CID VARCHAR(50), CNTRY VARCHAR(100))")
+cursor.execute("CREATE TABLE schema1.PX_CAT_G1V2 (ID VARCHAR(50), CAT VARCHAR(100), SUBCAT VARCHAR(100), MAINTENANCE VARCHAR(10))")
+
+conn.commit()
+print("\n✅ Setup Complete: All structures created explicitly from scratch!")
